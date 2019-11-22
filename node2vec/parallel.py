@@ -1,6 +1,18 @@
 import random
 import numpy as np
 from tqdm import tqdm
+from scipy.sparse import csr_matrix
+np_where = np.where
+
+
+FIRST_TRAVEL_KEY = 'first_travel_key'
+PROBABILITIES_KEY = 'probabilities'
+NEIGHBORS_KEY = 'neighbors'
+WEIGHT_KEY = 'weight'
+NUM_WALKS_KEY = 'num_walks'
+WALK_LENGTH_KEY = 'walk_length'
+P_KEY = 'p'
+Q_KEY = 'q'
 
 
 def parallel_generate_walks(d_graph: dict, global_walk_length: int, num_walks: int, cpu_num: int,
@@ -50,7 +62,6 @@ def parallel_generate_walks(d_graph: dict, global_walk_length: int, num_walks: i
             while len(walk) < walk_length:
 
                 walk_options = d_graph[walk[-1]].get(neighbors_key, None)
-
                 # Skip dead end nodes
                 if not walk_options:
                     break
@@ -59,8 +70,16 @@ def parallel_generate_walks(d_graph: dict, global_walk_length: int, num_walks: i
                     probabilities = d_graph[walk[-1]][first_travel_key]
                     walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
                 else:
-                    probabilities = d_graph[walk[-1]][probabilities_key][walk[-2]]
-                    walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
+                    try:
+                        probabilities = d_graph[walk[-1]][probabilities_key][walk[-2]]
+                    except KeyError as e:
+                        raise KeyError("{}".format(e)+" walk -1 {} in d_graph {} and walk -2 {} in prob key of -1 {}".format(walk[-1], walk[-1] in d_graph, walk[-2], walk[-2] in d_graph[walk[-1]][probabilities_key]))
+                        #raise KeyError(e)
+                    try:
+                        walk_to = np.random.choice(walk_options, size=1, p=probabilities)[0]
+                    except ValueError as e:
+                        print(len(probabilities), len(walk_options))
+                        raise ValueError(e)
 
                 walk.append(walk_to)
 
@@ -72,3 +91,81 @@ def parallel_generate_walks(d_graph: dict, global_walk_length: int, num_walks: i
         pbar.close()
 
     return walks
+
+def parallel_precompute_probabilities(d_graph:dict, weight_matrix: csr_matrix, nodes: list,p: int = 1, q: int = 1,
+                                          sampling_strategy: dict = None,quiet: bool = False) -> list:
+    
+        """
+        Precomputes transition probabilities for each node.
+        """
+        #d_graph = dict()
+        first_travel_done = set()
+        # do the initial travel in the main func
+        num_total_nodes = weight_matrix.shape[0]
+        indices = weight_matrix.indices
+        indptr = weight_matrix.indptr
+        if not quiet:
+            pbar = tqdm(total=len(nodes), desc='Computing transition probabilities')
+        nodes = [int(x) for x in nodes]
+        for source in nodes:
+            if not quiet:
+                pbar.update(1)
+            #print(np_where(weight_matrix[source,:] > 0).tolist())
+            #raise Exception
+            #print(np.array(list(range(num_total_nodes)))[np_where(weight_matrix[source,:] > 0, True, False)])
+            #print([x for x in np_where(weight_matrix[source,:] > 0, list(range(num_total_nodes)),False)])
+            d_graph[source][NEIGHBORS_KEY] = []
+            d_graph[source][NEIGHBORS_KEY] = [int(x) for x in indices[indptr[source]:indptr[source+1]] if x != source]#[x for x in np_where(weight_matrix.getrow(source) > 0, range(num_total_nodes),False).tolist() if x != source and x != False]
+            # Init probabilities dict for first travel
+            if PROBABILITIES_KEY not in d_graph[source]:
+                d_graph[source][PROBABILITIES_KEY] = dict()
+            for current_node in d_graph[source][NEIGHBORS_KEY]:
+
+                if current_node not in d_graph:
+                    d_graph[current_node] = {}
+                # Init probabilities dict
+                if NEIGHBORS_KEY not in d_graph[current_node]:
+                    d_graph[current_node][NEIGHBORS_KEY] = [int(x) for x in indices[indptr[current_node]:indptr[current_node+1]] if x != current_node]#[x for x in np_where(weight_matrix[current_node,:] > 0)[1].tolist() if x != current_node]
+                if PROBABILITIES_KEY not in d_graph[current_node]:
+                    d_graph[current_node][PROBABILITIES_KEY] = dict()
+                
+                unnormalized_weights = list()
+                first_travel_weights = list()
+                d_neighbors = list()
+
+                # Calculate unnormalized weights
+                for destination in d_graph[current_node][NEIGHBORS_KEY]:
+
+                    p = sampling_strategy[current_node].get(P_KEY,
+                                                                 p) if current_node in sampling_strategy else p
+                    q = sampling_strategy[current_node].get(Q_KEY,
+                                                                 q) if current_node in sampling_strategy else q
+
+                    if destination == source:  # Backwards probability
+                        ss_weight = weight_matrix[current_node,destination] * 1 / p
+                    elif destination in d_graph[source][NEIGHBORS_KEY]:  # If the neighbor is connected to the source
+                        ss_weight = weight_matrix[current_node ,destination]
+                    else:
+                        ss_weight = weight_matrix[current_node, destination] * 1 / q
+
+                    # Assign the unnormalized sampling strategy weight, normalize during random walk
+                    unnormalized_weights.append(ss_weight)
+                    if current_node not in first_travel_done:
+                        first_travel_weights.append(weight_matrix[current_node,destination])
+
+
+
+                # Normalize
+                unnormalized_weights = np.array(unnormalized_weights)
+                d_graph[current_node][PROBABILITIES_KEY][
+                    source] = unnormalized_weights / unnormalized_weights.sum()
+                
+                if current_node not in first_travel_done:
+                    unnormalized_weights = np.array(first_travel_weights)
+                    d_graph[current_node][FIRST_TRAVEL_KEY] = unnormalized_weights / unnormalized_weights.sum()
+                    first_travel_done.add(current_node)
+                
+        if not quiet:
+            pbar.close()
+        return d_graph
+
