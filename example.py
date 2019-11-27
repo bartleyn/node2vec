@@ -11,13 +11,6 @@ temp_folder = './tmp'
 # Create a graph
 graph = nx.fast_gnp_random_graph(n=100, p=0.5)
 
-#weight_mat = nx.adjacency_matrix(graph, weight=True)
-#indices = weight_mat.indices
-#indptr = weight_mat.indptr
-#print(list(graph.neighbors(1)))
-#print([x for x in indices[indptr[1]:indptr[2]]])
-#raise Exception
-
 
 # Precompute probabilities and generate walks
 node2vec = Node2Vec(graph, dimensions=64, walk_length=30, num_walks=200, workers=4, temp_folder=temp_folder)

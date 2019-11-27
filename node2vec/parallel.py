@@ -98,7 +98,6 @@ def parallel_precompute_probabilities(d_graph:dict, weight_matrix: csr_matrix, n
         """
         Precomputes transition probabilities for each node.
         """
-        #d_graph = dict()
         first_travel_done = set()
         # do the initial travel in the main func
         num_total_nodes = weight_matrix.shape[0]
@@ -110,12 +109,8 @@ def parallel_precompute_probabilities(d_graph:dict, weight_matrix: csr_matrix, n
         for source in nodes:
             if not quiet:
                 pbar.update(1)
-            #print(np_where(weight_matrix[source,:] > 0).tolist())
-            #raise Exception
-            #print(np.array(list(range(num_total_nodes)))[np_where(weight_matrix[source,:] > 0, True, False)])
-            #print([x for x in np_where(weight_matrix[source,:] > 0, list(range(num_total_nodes)),False)])
             d_graph[source][NEIGHBORS_KEY] = []
-            d_graph[source][NEIGHBORS_KEY] = [int(x) for x in indices[indptr[source]:indptr[source+1]] if x != source]#[x for x in np_where(weight_matrix.getrow(source) > 0, range(num_total_nodes),False).tolist() if x != source and x != False]
+            d_graph[source][NEIGHBORS_KEY] = [int(x) for x in indices[indptr[source]:indptr[source+1]] if x != source]
             # Init probabilities dict for first travel
             if PROBABILITIES_KEY not in d_graph[source]:
                 d_graph[source][PROBABILITIES_KEY] = dict()
@@ -125,7 +120,7 @@ def parallel_precompute_probabilities(d_graph:dict, weight_matrix: csr_matrix, n
                     d_graph[current_node] = {}
                 # Init probabilities dict
                 if NEIGHBORS_KEY not in d_graph[current_node]:
-                    d_graph[current_node][NEIGHBORS_KEY] = [int(x) for x in indices[indptr[current_node]:indptr[current_node+1]] if x != current_node]#[x for x in np_where(weight_matrix[current_node,:] > 0)[1].tolist() if x != current_node]
+                    d_graph[current_node][NEIGHBORS_KEY] = [int(x) for x in indices[indptr[current_node]:indptr[current_node+1]] if x != current_node]
                 if PROBABILITIES_KEY not in d_graph[current_node]:
                     d_graph[current_node][PROBABILITIES_KEY] = dict()
                 
