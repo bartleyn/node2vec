@@ -6,19 +6,7 @@ import networkx as nx
 import gensim
 from joblib import Parallel, delayed
 from tqdm import tqdm
-import json 
 from .parallel import parallel_generate_walks, parallel_precompute_probabilities
-
-class NPEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer) or isinstance(obj, np.int64):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        else:
-            return super(MyEncoder, self).default(obj)
 
 
 class Node2Vec:
