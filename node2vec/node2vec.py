@@ -78,16 +78,16 @@ class Node2Vec:
             self._precompute_probabilities()
         else:
             self._precompute_probabilities_single()
-        #cls = NPEncoder()
-        #with open('./d_graph_parallel.json', 'w') as fp:
-        #    x = json.dumps(self.d_graph, cls=NPEncoder, indent=4)
-        #    fp.write(x)
-        #self.d_graph = defaultdict(dict)
-        #self._precompute_probabilities_single()
-        #with open('./d_graph.json', 'w') as fp:
-        #    x = json.dumps(self.d_graph,  cls=NPEncoder, indent=4)
-        #    fp.write(x)
-        #raise Exception
+        cls = NPEncoder()
+        with open('./d_graph_parallel.json', 'w') as fp:
+            x = json.dumps(self.d_graph, cls=NPEncoder, indent=4)
+            fp.write(x)
+        self.d_graph = defaultdict(dict)
+        self._precompute_probabilities_single()
+        with open('./d_graph.json', 'w') as fp:
+            x = json.dumps(self.d_graph,  cls=NPEncoder, indent=4)
+            fp.write(x)
+        raise Exception
         self.walks = self._generate_walks()
 
     def _precompute_probabilities(self):
@@ -123,9 +123,12 @@ class Node2Vec:
         #print(self.d_graph)
         '''
         for x in d_graph_results:
+            #print(x.keys())
+            #continue
             for key in x:
-                if self.FIRST_TRAVEL_KEY in x[key]:#if len(x[key][self.PROBABILITIES_KEY]) > 0:
+                if key not in self.d_graph:#self.FIRST_TRAVEL_KEY in x[key]:#if len(x[key][self.PROBABILITIES_KEY]) > 0:
                     self.d_graph.update({key:x[key]})
+        #raise Exception
     def _precompute_probabilities_single(self):
         """
         Precomputes transition probabilities for each node.
@@ -230,5 +233,5 @@ class Node2Vec:
 
         if 'size' not in skip_gram_params:
             skip_gram_params['size'] = self.dimensions
-        #np.random.seed(42)
+        np.random.seed(42)
         return gensim.models.Word2Vec(self.walks, **skip_gram_params)
